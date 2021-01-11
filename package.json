@@ -1,0 +1,14 @@
+{
+  "name": "creditdata",
+  "version": "1.0.0",
+  "description": "Convert XLSX data to valid JSON data",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Daniel Orbach",
+  "license": "ISC",
+  "dependencies": {
+    "xlsx": "^0.16.9"
+  }
+}
