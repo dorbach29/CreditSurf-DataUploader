@@ -9,6 +9,7 @@
   "author": "Daniel Orbach",
   "license": "ISC",
   "dependencies": {
+    "chalk": "^4.1.0",
     "xlsx": "^0.16.9"
   }
 }
