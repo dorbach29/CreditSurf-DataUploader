@@ -1,54 +1,77 @@
 const XLSX = require('xlsx');
 const chk = require('chalk');
+const {MongoClient} = require('mongodb');
+
+//Parser handles parsing of the sheet and uploading to mongo 
+const parser = require('./functions.js');
 
 
-//FETCHING EXCEL WORKBOOK + GETTING FIRST sheet; 
-let workbook; 
-let sheet; 
-try{
-    workbook = XLSX.readFile(process.argv[2]);
-    sheet = workbook.Sheets[workbook.SheetNames[0]];
-    console.log(chk.green("Read File Successfully"));
-    if(!sheet) throw "Sheet not found";
-
-} catch (error) {
-    console.log(chk.red.bold("ERROR READING THE FILE:"));
-    throw error;
-}
-
-
-
-
-
-
-
-let row = 1;
-//Getting cell range
-let a1_range = sheet['!ref'];
-//Decoding range
-let range = XLSX.utils.decode_range(a1_range);
-let endCol = range.e.c;
-while(true){
-
-    //CHECK IF END//
-    const primary_address = {c:0, r: row};
-    const primary_cell = sheet[XLSX.utils.encode_cell(primary_address)].v;
-    if(primary_cell === "~END~") break;
-    //ALL OPERATIONS BELLOW//
-
-
-    for(let col = 0; col <= endCol; col++){
-
-        //Getting Cell
-        const cell_adress = {c:col, r:row};
-        const cell = sheet[XLSX.utils.encode_cell(cell_adress)].v;
-        
-        //Getting Header
-        const h_adress = {c:col, r:0};
-        const header = sheet[XLSX.utils.encode_cell(h_adress)].v;
+//Function to get the sheet given a path
+function getSheet(path){
+    let workbook; 
+    let sheet; 
+    try{
+        workbook = XLSX.readFile(path);
+        sheet = workbook.Sheets[workbook.SheetNames[0]];
+        console.log(chk.green("Read File Successfully"));
+        if(!sheet) throw "Sheet not found";
+    
+    } catch (error) {
+        console.log(chk.red.bold("app.js: Error reading xlsx file"));
+        throw error;
     }
-    
-    
-    row++;
+    return {workbook : workbook, sheet : sheet};
 }
+
+//Initiates connections to mongodb
+//Upserts data to MongoDB Database given the MondoDbClient, Database, Collection, and ExcelSheet
+async function main(client, dbName, collectionName, excelSheet, parser){
+    try {
+         
+        //Getting the excell sheet with the data
+        const {workbook, sheet} =  getSheet(excelSheet);
+
+        await client.connect(); 
+        console.log(chk.green("app.js: Connected To DB"))
+
+        //Getting the mongoDB collection
+        const database = client.db(dbName);
+        const collection = database.collection(collectionName);
+
+      
+
+        await parser.importData(sheet, collection);
+    }
+    catch (error){
+        throw error;
+    } finally {
+        await client.close();
+    }
+}
+
+///MONGO OPTIONS
+const client = MongoClient('mongodb://127.0.0.1:27017/', { useUnifiedTopology: true });
+const dbName = "creditsurf";
+const collectionName = "cards";
+
+
+///RUNNING PORGRAM
+if(process.argv[2]){
+    let excelSheet = process.argv[2];
+    main(client, dbName, collectionName, excelSheet, parser);
+} else {
+    console.log("Please provide a path to a valid excelSheet");
+}
+ 
+
+
+
+
+
+
+
+
+
+
+
 
