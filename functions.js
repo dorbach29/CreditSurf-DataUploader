@@ -30,6 +30,7 @@ CountriesExcluded:getArray,
 Steps:getArray,
 ClaimSteps:getArray,
 ClaimDocuments:getArray,
+Users:getInt,
 }
 
 
@@ -39,8 +40,7 @@ function generateID(object){
 }
 
 //Builds Mongo Object given row of the excel sheet
-//To generate more complex objects a possibility is to then parse through the objects and generate objects
-//NEEDS REFACTORING FOR BETTER ERROR HANDLING
+//To generate more complex objects a possibility is to then parse through the creared object and restructure it
 function buildObject(sheet, endCol, row){
 
     //Initializing Object
@@ -65,8 +65,15 @@ function buildObject(sheet, endCol, row){
         if(!getValue){
             throw `functions.js: HeaderField <${header.v}> lacks equivalent method`;
         } else {
+            
+            //Getting values for object.v
+            try{ 
             const value = getValue(cell.v);
             object[header.v] = value; 
+            }
+            catch (err) {
+                console.log(chk.red(`functions.js: Cell at ${row} , ${col} is missing a value`));
+            }
         }
     }
 
@@ -76,7 +83,62 @@ function buildObject(sheet, endCol, row){
 }
 
 
-//Row by row creates mongo objects and uploads them to data bases
+
+
+
+async function insertDocuments(objectArray, collection){
+    if(objectArray.length === 0){
+        console.log(chk.blue("functions.js: No documents to be inserted/updated"));
+        return;
+    };
+
+    //Rows that were not able to be inserted
+    const   toBeUpdated = []
+    
+    //Inserts documents that can be inserted 
+    try {
+        console.log("Inserting objects");
+
+        //Inserting array of objects
+        let {insertedCount, insertedIds} = await collection.insertMany(objectArray,  {"ordered" : false});
+        console.log(chk.green(`functions.js: Inserted ${insertedCount} documents successfully`));
+
+        //Optionally check for all rows not inserted below
+        console.log(chk.green(`function.js: ${insertedCount} documents inserted successfully`));
+    } catch (err){
+        for(let i = 0; i < err.writeErrors.length; i ++) {
+            toBeUpdated.push(i);
+        }
+        console.log(chk.blue(`functions.js: ${toBeUpdated.length} documents not inserted, attemting update.`));
+    }
+    return toBeUpdated;
+}
+
+
+
+
+//Takes the objects, index of those we need to update and the collection to send them to
+async function updateDocuments(objectArray, toBeUpdated, collection){
+    let numUpdated = 0;
+    for(let index in toBeUpdated){
+        let CardID;
+        try {   
+            //Attempting to update that document
+            CardID = objectArray[index]["_id"];
+            await collection.replaceOne({"_id" : CardID}, objectArray[index]);
+            numUpdated ++;
+        } catch (err) {
+            console.log(chk.red(`functions.js: ${CardID} at row ${index} not inserted or updated`));
+        }
+    }
+    console.log(chk.green(`functions.js ${numUpdated} updated successfully`))
+}
+
+
+
+
+
+//CREATES MONGO OBJECTS AND PUTS THEM IN DATA BASE
 async function importData(sheet, collection){
     let row = 1;
 
@@ -88,13 +150,13 @@ async function importData(sheet, collection){
     //Initializing where we will store the mongo-objects
     const objectArray = [];
 
+    //Fetching objects from excel sheet
     while(true){
 
         //Checking if the end is reached
         const primary_address = {c:0, r: row};
         const primary_cell = sheet[XLSX.utils.encode_cell(primary_address)].v;
         if(primary_cell === "~END~") break;
-
 
         //Try to build mongo-object for that row, and push onto the objectArray
         try { 
@@ -108,26 +170,24 @@ async function importData(sheet, collection){
         row++;
     }
 
-    //Only proceeds if their are documents to be inserted
-    if(objectArray.length === 0){
-        console.log(chk.blue("functions.js: No documents to be inserted/updated"));
-        return;
-    };
+    console.log(chk.green(`functions.js: Created ${objectArray.length} objects from data`))
 
-    //Pushing object array to mongodb
-    try {
-        //Inserting array of objects
-        let {result} = await collection.insertMany(objectArray,  {"orderd" : false});
-        console.log(chk.green(result.insertedCount));
-
-        //Optionally check for all rows not inserted below
-
-    } catch (err){
-        console.log(chk.red("functions.js: Error inserting documents"))
+    try{
+        const toBeUpdated = await insertDocuments(objectArray, collection);
+        const updateResult = await updateDocuments(objectArray, toBeUpdated, collection);
+    } catch (err) {
         throw err;
     }
     return;
 }
+
+
+
+
+
+
+
+
 
 const parser = {
     importData : importData,

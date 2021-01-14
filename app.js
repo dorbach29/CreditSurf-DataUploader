@@ -13,7 +13,7 @@ function getSheet(path){
     try{
         workbook = XLSX.readFile(path);
         sheet = workbook.Sheets[workbook.SheetNames[0]];
-        console.log(chk.green("Read File Successfully"));
+        console.log("Read File Successfully");
         if(!sheet) throw "Sheet not found";
     
     } catch (error) {
@@ -32,7 +32,7 @@ async function main(client, dbName, collectionName, excelSheet, parser){
         const {workbook, sheet} =  getSheet(excelSheet);
 
         await client.connect(); 
-        console.log(chk.green("app.js: Connected To DB"))
+        console.log("app.js: Connected To DB");
 
         //Getting the mongoDB collection
         const database = client.db(dbName);
@@ -43,7 +43,7 @@ async function main(client, dbName, collectionName, excelSheet, parser){
         await parser.importData(sheet, collection);
     }
     catch (error){
-        throw error;
+        console.log( error);
     } finally {
         await client.close();
     }
@@ -60,7 +60,7 @@ if(process.argv[2]){
     let excelSheet = process.argv[2];
     main(client, dbName, collectionName, excelSheet, parser);
 } else {
-    console.log("Please provide a path to a valid excelSheet");
+    console.log(chk.redBright("Please provide a path to a valid excelSheet: node app.js <path>"));
 }
  
 
